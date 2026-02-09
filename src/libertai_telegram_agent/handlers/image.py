@@ -49,12 +49,15 @@ async def image_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if api_key is None:
         allowed, remaining = await rate_limiter.check_and_increment(telegram_id, "image")
         if not allowed:
+            login_hint = "3. Use /login <your-api-key> to connect your account"
+            if chat_type in ("group", "supergroup"):
+                login_hint = "3. DM me with /login <your-api-key> to connect your account"
             await update.message.reply_text(
                 "You've reached your daily free image generation limit.\n\n"
                 "For unlimited access:\n"
                 "1. Buy credits at https://console.libertai.io\n"
                 "2. Generate an API key at https://console.libertai.io/api-keys\n"
-                "3. Use /login <your-api-key> to connect your account"
+                f"{login_hint}"
             )
             return
 

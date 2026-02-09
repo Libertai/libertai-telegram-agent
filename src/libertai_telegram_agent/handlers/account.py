@@ -28,10 +28,21 @@ async def validate_api_key(api_base_url: str, api_key: str) -> float | None:
 
 async def login_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /login command. Validates and stores an encrypted API key."""
+    chat_type = update.effective_chat.type
+
+    # Block /login in groups to protect API keys
+    if chat_type in ("group", "supergroup"):
+        await update.message.reply_text(
+            "For security, /login is only available in DMs.\n"
+            "Send me a private message to connect your API key."
+        )
+        return
+
     if not context.args:
         await update.message.reply_text(
             "Usage: /login <api_key>\n\n"
-            "Get your API key from https://libertai.io and send it here.\n"
+            "Get your API key at https://console.libertai.io/api-keys "
+            "and send it here.\n"
             "Your message will be deleted immediately for security."
         )
         return
@@ -50,7 +61,6 @@ async def login_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    chat_type = update.effective_chat.type
 
     # Validate the API key
     balance = await validate_api_key(inference.api_base_url, api_key)
@@ -66,10 +76,6 @@ async def login_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     encrypted = encrypt_api_key(api_key, encryption_key)
     await db.set_user_api_key(user_id, encrypted)
 
-    # In groups, set the user as group admin
-    if chat_type in ("group", "supergroup"):
-        await db.set_group_admin(chat_id, user_id)
-
     await context.bot.send_message(
         chat_id=chat_id,
         text=f"API key connected successfully! Your balance: {balance} credits.",
@@ -78,16 +84,20 @@ async def login_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def logout_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /logout command. Clears stored API key."""
+    chat_type = update.effective_chat.type
+
+    if chat_type in ("group", "supergroup"):
+        await update.message.reply_text(
+            "For security, /logout is only available in DMs.\n"
+            "Send me a private message to manage your account."
+        )
+        return
+
     db: Database = context.bot_data["db"]
     user_id = update.effective_user.id
-    chat_id = update.effective_chat.id
-    chat_type = update.effective_chat.type
 
     await db.ensure_user(user_id)
     await db.set_user_api_key(user_id, None)
-
-    if chat_type in ("group", "supergroup"):
-        await db.remove_group_admin(chat_id)
 
     await update.message.reply_text("Logged out. Your API key has been removed.")
 

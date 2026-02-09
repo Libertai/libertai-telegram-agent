@@ -197,21 +197,15 @@ class TestLoginCommand:
             text = call_args[1].get("text", "")
         assert "invalid" in text.lower() or "failed" in text.lower() or "error" in text.lower()
 
-    async def test_group_login_sets_group_admin(self, db, rate_limiter):
+    async def test_group_login_blocked(self, db, rate_limiter):
         update = make_update(user_id=12345, chat_id=-1001, chat_type="group")
         context = make_context(db, rate_limiter, ENCRYPTION_KEY)
         context.args = ["my-api-key"]
 
-        with patch(
-            "libertai_telegram_agent.handlers.account.validate_api_key",
-            new_callable=AsyncMock,
-            return_value=10.5,
-        ):
-            await login_command(update, context)
+        await login_command(update, context)
 
-        settings = await db.get_group_settings(-1001)
-        assert settings is not None
-        assert settings["admin_id"] == 12345
+        call_text = update.message.reply_text.call_args[0][0]
+        assert "DM" in call_text or "private" in call_text.lower()
 
     async def test_delete_message_failure_does_not_crash(self, db, rate_limiter):
         """If deleting the message fails (e.g., no permission), login should continue."""
@@ -260,17 +254,14 @@ class TestLogoutCommand:
 
         update.message.reply_text.assert_awaited_once()
 
-    async def test_group_logout_removes_group_admin(self, db, rate_limiter):
-        await db.ensure_user(12345)
-        await db.set_group_admin(-1001, 12345)
-
+    async def test_group_logout_blocked(self, db, rate_limiter):
         update = make_update(user_id=12345, chat_id=-1001, chat_type="group")
         context = make_context(db, rate_limiter, ENCRYPTION_KEY)
 
         await logout_command(update, context)
 
-        settings = await db.get_group_settings(-1001)
-        assert settings is None
+        call_text = update.message.reply_text.call_args[0][0]
+        assert "DM" in call_text or "private" in call_text.lower()
 
 
 # ── account_command ───────────────────────────────────────────────────
