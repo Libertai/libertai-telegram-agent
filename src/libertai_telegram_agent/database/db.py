@@ -10,7 +10,7 @@ import aiosqlite
 class Database:
     """Async SQLite database wrapper for the Telegram agent."""
 
-    def __init__(self, db_path: str) -> None:
+    def __init__(self, db_path: str = "libertai_agent.db") -> None:
         self.db_path = db_path
         self._db: aiosqlite.Connection | None = None
 
