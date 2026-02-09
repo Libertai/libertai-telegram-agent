@@ -35,7 +35,7 @@ async def post_init(application: Application) -> None:
     db = Database()
     await db.initialize()
     application.bot_data["db"] = db
-    application.bot_data["rate_limiter"].db = db
+    application.bot_data["rate_limiter"]._db = db
     logger.info("Database initialized")
 
 
