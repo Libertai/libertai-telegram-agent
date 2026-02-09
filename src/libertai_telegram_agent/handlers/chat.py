@@ -15,10 +15,12 @@ from libertai_telegram_agent.database.db import Database
 from libertai_telegram_agent.services.encryption import decrypt_api_key
 from libertai_telegram_agent.services.inference import AVAILABLE_MODELS, InferenceService
 from libertai_telegram_agent.services.rate_limiter import RateLimiter
+from libertai_telegram_agent.services.tools import TOOL_DEFINITIONS, execute_tool
 
 logger = logging.getLogger(__name__)
 
 TELEGRAM_MAX_MESSAGE_LENGTH = 4096
+MAX_TOOL_ROUNDS = 3
 
 SYSTEM_PROMPT = (
     "You are the LibertAI assistant, a helpful AI bot running on the Aleph Cloud "
@@ -28,31 +30,11 @@ SYSTEM_PROMPT = (
     "or generate an image, use the generate_image tool. The image prompt you pass "
     "to generate_image must ALWAYS be in English, regardless of what language the "
     "user is speaking.\n\n"
+    "Use web_search to look up current information when needed. "
+    "Use crypto_price to get live cryptocurrency prices. "
+    "Use fetch_url to read the content of a webpage.\n\n"
     "Keep your responses concise and to the point unless the user asks for detail."
 )
-
-TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "generate_image",
-            "description": (
-                "Generate an image from a text description. "
-                "Use this when the user asks you to draw, create, or generate an image."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "prompt": {
-                        "type": "string",
-                        "description": "A detailed description of the image to generate",
-                    },
-                },
-                "required": ["prompt"],
-            },
-        },
-    },
-]
 
 
 def should_respond_in_group(update: Update, bot_username: str) -> bool:
@@ -146,20 +128,18 @@ async def _split_and_send(update: Update, text: str) -> None:
 
 async def _handle_image_tool_call(
     update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
     inference: InferenceService,
     api_key: str | None,
     tool_call,
     conv: dict,
     db: Database,
-) -> None:
-    """Execute a generate_image tool call and send the result."""
+) -> str:
+    """Execute a generate_image tool call and send the result. Returns result string for tool loop."""
     try:
         args = json.loads(tool_call.function.arguments)
         prompt = args.get("prompt", "")
     except (json.JSONDecodeError, KeyError):
-        await update.message.reply_text("Sorry, I couldn't understand the image request.")
-        return
+        return "Error: could not parse image prompt"
 
     await update.message.chat.send_action(ChatAction.UPLOAD_PHOTO)
 
@@ -170,9 +150,11 @@ async def _handle_image_tool_call(
             caption=prompt[:1024],
         )
         await db.add_message(conv["id"], 0, "assistant", f"[Generated image: {prompt}]")
+        return f"Image generated successfully with prompt: {prompt}"
     except Exception:
         logger.exception("Image generation error")
         await update.message.reply_text("Sorry, I couldn't generate that image. Please try again.")
+        return "Image generation failed"
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -271,30 +253,50 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         openai_messages_content = f"[{sender_name}] {openai_messages_content}"
     messages.append({"role": "user", "content": openai_messages_content})
 
-    # Send typing indicator and generate response
+    # Send typing indicator
     await update.message.chat.send_action(ChatAction.TYPING)
 
-    try:
-        result = await inference.chat(
-            messages=messages, model=model, api_key=api_key, tools=TOOLS,
-        )
-    except Exception as e:
-        logger.error(f"Inference error for user {telegram_id}: {e}")
-        await update.message.reply_text(
-            "Sorry, I couldn't process your request right now. Please try again in a moment."
-        )
-        return
+    # Tool call loop: LLM may call tools, we execute and feed results back
+    for _round in range(MAX_TOOL_ROUNDS + 1):
+        try:
+            result = await inference.chat(
+                messages=messages, model=model, api_key=api_key, tools=TOOL_DEFINITIONS,
+            )
+        except Exception as e:
+            logger.error(f"Inference error for user {telegram_id}: {e}")
+            await update.message.reply_text(
+                "Sorry, I couldn't process your request right now. Please try again in a moment."
+            )
+            return
 
-    # Handle tool calls (e.g. image generation)
-    if result.tool_calls:
+        # No tool calls - we have the final text response
+        if not result.tool_calls:
+            response_text = result.content or ""
+            await db.add_message(conv["id"], 0, "assistant", response_text)
+            await _split_and_send(update, response_text)
+            return
+
+        # Process tool calls
+        # Append assistant message with tool calls to conversation
+        messages.append(result.model_dump(exclude_none=True))
+
         for tool_call in result.tool_calls:
-            if tool_call.function.name == "generate_image":
-                await _handle_image_tool_call(
-                    update, context, inference, api_key, tool_call, conv, db,
-                )
-        return
+            tool_name = tool_call.function.name
 
-    # Regular text response
-    response_text = result.content or ""
-    await db.add_message(conv["id"], 0, "assistant", response_text)
-    await _split_and_send(update, response_text)
+            if tool_name == "generate_image":
+                # Image gen is special - sends photo directly, doesn't need LLM follow-up
+                await _handle_image_tool_call(update, inference, api_key, tool_call, conv, db)
+                return
+
+            # Execute other tools and feed results back
+            await update.message.chat.send_action(ChatAction.TYPING)
+            tool_result = await execute_tool(tool_name, tool_call.function.arguments)
+
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": tool_result,
+            })
+
+    # If we exhausted tool rounds, send whatever we have
+    await update.message.reply_text("Sorry, I took too long processing that request. Please try again.")
