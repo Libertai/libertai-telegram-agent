@@ -6,7 +6,7 @@ import base64
 import logging
 
 from telegram import Update
-from telegram.constants import ChatAction
+from telegram.constants import ChatAction, ParseMode
 from telegram.ext import ContextTypes
 
 from libertai_telegram_agent.database.db import Database
@@ -76,7 +76,10 @@ async def _get_api_key_for_request(
 async def _split_and_send(update: Update, text: str) -> None:
     """Send a message, splitting into chunks if it exceeds Telegram's limit."""
     if len(text) <= TELEGRAM_MAX_MESSAGE_LENGTH:
-        await update.message.reply_text(text)
+        try:
+            await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+        except Exception:
+            await update.message.reply_text(text)
         return
 
     # Split at paragraph boundaries, then line boundaries, then hard split
@@ -99,7 +102,10 @@ async def _split_and_send(update: Update, text: str) -> None:
         text = text[split_at:].lstrip()
 
     for chunk in chunks:
-        await update.message.reply_text(chunk)
+        try:
+            await update.message.reply_text(chunk, parse_mode=ParseMode.MARKDOWN)
+        except Exception:
+            await update.message.reply_text(chunk)
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
