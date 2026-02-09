@@ -55,6 +55,10 @@ async def image_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             )
             return
 
+    # Store in conversation history
+    chat_id = update.effective_chat.id
+    conv = await db.get_or_create_conversation(chat_id, chat_type)
+
     await update.message.chat.send_action(ChatAction.UPLOAD_PHOTO)
 
     try:
@@ -63,6 +67,8 @@ async def image_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             photo=io.BytesIO(image_bytes),
             caption=prompt,
         )
+        await db.add_message(conv["id"], telegram_id, "user", f"/image {prompt}")
+        await db.add_message(conv["id"], 0, "assistant", f"[Generated image: {prompt}]")
     except Exception:
         logger.exception("Failed to generate image for prompt: %s", prompt)
         await update.message.reply_text(
