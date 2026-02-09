@@ -13,6 +13,14 @@ from libertai_telegram_agent.services.inference import InferenceService
 from libertai_telegram_agent.services.rate_limiter import RateLimiter
 
 
+def _make_chat_result(content, tool_calls=None):
+    """Create a mock message object matching the OpenAI response format."""
+    msg = MagicMock()
+    msg.content = content
+    msg.tool_calls = tool_calls
+    return msg
+
+
 @pytest.fixture
 async def db(tmp_path):
     """Create and initialize a temporary database."""
@@ -63,6 +71,7 @@ def make_update(text="Hello", user_id=12345, chat_id=12345, chat_type="private")
     update.message.caption = None
     update.message.reply_to_message = None
     update.message.reply_text = AsyncMock()
+    update.message.reply_photo = AsyncMock()
     update.message.chat.send_action = AsyncMock()
     return update
 
@@ -107,7 +116,7 @@ class TestHandleMessageDM:
     async def test_sends_response(self, db, rate_limiter, inference, encryption_key):
         update = make_update(text="Hello")
         context = make_context(db, rate_limiter, inference, encryption_key)
-        inference.chat = AsyncMock(return_value="Hi there!")
+        inference.chat = AsyncMock(return_value=_make_chat_result("Hi there!"))
 
         await handle_message(update, context)
 
@@ -118,7 +127,7 @@ class TestHandleMessageDM:
     async def test_stores_messages_in_db(self, db, rate_limiter, inference, encryption_key):
         update = make_update(text="Hello bot")
         context = make_context(db, rate_limiter, inference, encryption_key)
-        inference.chat = AsyncMock(return_value="Hello human")
+        inference.chat = AsyncMock(return_value=_make_chat_result("Hello human"))
 
         await handle_message(update, context)
 
@@ -133,7 +142,7 @@ class TestHandleMessageDM:
     async def test_sends_typing_action(self, db, rate_limiter, inference, encryption_key):
         update = make_update(text="Hello")
         context = make_context(db, rate_limiter, inference, encryption_key)
-        inference.chat = AsyncMock(return_value="response")
+        inference.chat = AsyncMock(return_value=_make_chat_result("response"))
 
         await handle_message(update, context)
 
@@ -145,7 +154,7 @@ class TestHandleMessageRateLimiting:
         limiter = RateLimiter(db, daily_messages=1, daily_images=0)
         update = make_update(text="First")
         context = make_context(db, limiter, inference, encryption_key)
-        inference.chat = AsyncMock(return_value="response")
+        inference.chat = AsyncMock(return_value=_make_chat_result("response"))
 
         await handle_message(update, context)  # Uses the 1 allowed message
 
@@ -166,12 +175,12 @@ class TestHandleMessageRateLimiting:
 
         update = make_update(text="First")
         context = make_context(db, limiter, inference, encryption_key)
-        inference.chat = AsyncMock(return_value="response1")
+        inference.chat = AsyncMock(return_value=_make_chat_result("response1"))
 
         await handle_message(update, context)
 
         update2 = make_update(text="Second")
-        inference.chat = AsyncMock(return_value="response2")
+        inference.chat = AsyncMock(return_value=_make_chat_result("response2"))
         await handle_message(update2, context)
 
         # Both should get real responses, not limit messages
@@ -194,7 +203,7 @@ class TestHandleMessageGroups:
     async def test_responds_in_group_when_mentioned(self, db, rate_limiter, inference, encryption_key):
         update = make_update(text="@test_bot hello!", chat_type="group")
         context = make_context(db, rate_limiter, inference, encryption_key)
-        inference.chat = AsyncMock(return_value="Hi from group!")
+        inference.chat = AsyncMock(return_value=_make_chat_result("Hi from group!"))
 
         await handle_message(update, context)
 
@@ -205,7 +214,7 @@ class TestHandleMessageGroups:
     async def test_strips_bot_mention_from_group_message(self, db, rate_limiter, inference, encryption_key):
         update = make_update(text="@test_bot what is Python?", chat_type="group")
         context = make_context(db, rate_limiter, inference, encryption_key)
-        inference.chat = AsyncMock(return_value="Python is a language")
+        inference.chat = AsyncMock(return_value=_make_chat_result("Python is a language"))
 
         await handle_message(update, context)
 
@@ -251,7 +260,7 @@ class TestSplitLongMessages:
         long_response = "A" * 5000  # Over 4096 limit
         update = make_update(text="Hello")
         context = make_context(db, rate_limiter, inference, encryption_key)
-        inference.chat = AsyncMock(return_value=long_response)
+        inference.chat = AsyncMock(return_value=_make_chat_result(long_response))
 
         await handle_message(update, context)
 
@@ -261,8 +270,39 @@ class TestSplitLongMessages:
     async def test_short_message_not_split(self, db, rate_limiter, inference, encryption_key):
         update = make_update(text="Hello")
         context = make_context(db, rate_limiter, inference, encryption_key)
-        inference.chat = AsyncMock(return_value="Short reply")
+        inference.chat = AsyncMock(return_value=_make_chat_result("Short reply"))
 
         await handle_message(update, context)
 
         assert update.message.reply_text.call_count == 1
+
+
+class TestToolCalls:
+    async def test_image_tool_call_sends_photo(self, db, rate_limiter, inference, encryption_key):
+        update = make_update(text="Draw me a cat")
+        context = make_context(db, rate_limiter, inference, encryption_key)
+
+        tool_call = MagicMock()
+        tool_call.function.name = "generate_image"
+        tool_call.function.arguments = '{"prompt": "a cute cat"}'
+
+        inference.chat = AsyncMock(
+            return_value=_make_chat_result("", tool_calls=[tool_call])
+        )
+        inference.generate_image = AsyncMock(return_value=b"\x89PNG fake image data")
+
+        await handle_message(update, context)
+
+        inference.generate_image.assert_awaited_once()
+        update.message.reply_photo.assert_awaited_once()
+
+    async def test_regular_message_no_tool_call(self, db, rate_limiter, inference, encryption_key):
+        update = make_update(text="Hello")
+        context = make_context(db, rate_limiter, inference, encryption_key)
+        inference.chat = AsyncMock(return_value=_make_chat_result("Hi!"))
+
+        await handle_message(update, context)
+
+        update.message.reply_text.assert_called()
+        call_text = update.message.reply_text.call_args[0][0]
+        assert "Hi!" in call_text

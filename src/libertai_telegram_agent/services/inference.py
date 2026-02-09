@@ -28,21 +28,21 @@ class InferenceService:
             api_key=api_key or self.default_api_key,
         )
 
-    async def chat(self, messages, model, api_key=None) -> str:
-        """Send a chat completion request, retrying once after 2s on failure."""
+    async def chat(self, messages, model, api_key=None, tools=None):
+        """Send a chat completion request, retrying once after 2s on failure.
+
+        Returns the full message object from the API response.
+        """
         client = self.get_client(api_key)
+        kwargs = {"model": model, "messages": messages}
+        if tools:
+            kwargs["tools"] = tools
         try:
-            response = await client.chat.completions.create(
-                model=model,
-                messages=messages,
-            )
+            response = await client.chat.completions.create(**kwargs)
         except Exception:
             await asyncio.sleep(2)
-            response = await client.chat.completions.create(
-                model=model,
-                messages=messages,
-            )
-        return response.choices[0].message.content
+            response = await client.chat.completions.create(**kwargs)
+        return response.choices[0].message
 
     async def generate_image(self, prompt, api_key=None, size="1024x1024") -> bytes:
         """Generate an image and return the decoded bytes."""

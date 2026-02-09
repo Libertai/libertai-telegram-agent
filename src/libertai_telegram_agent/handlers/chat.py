@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import base64
+import io
+import json
 import logging
 
 from telegram import Update
@@ -17,6 +19,38 @@ from libertai_telegram_agent.services.rate_limiter import RateLimiter
 logger = logging.getLogger(__name__)
 
 TELEGRAM_MAX_MESSAGE_LENGTH = 4096
+
+SYSTEM_PROMPT = (
+    "You are the LibertAI assistant, a helpful AI bot running on the Aleph Cloud "
+    "decentralized cloud infrastructure. You are powered by open-source AI models "
+    "through the LibertAI decentralized AI inference platform.\n\n"
+    "You are friendly, concise, and helpful. When users ask you to create, draw, "
+    "or generate an image, use the generate_image tool.\n\n"
+    "Keep your responses concise and to the point unless the user asks for detail."
+)
+
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "generate_image",
+            "description": (
+                "Generate an image from a text description. "
+                "Use this when the user asks you to draw, create, or generate an image."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "prompt": {
+                        "type": "string",
+                        "description": "A detailed description of the image to generate",
+                    },
+                },
+                "required": ["prompt"],
+            },
+        },
+    },
+]
 
 
 def should_respond_in_group(update: Update, bot_username: str) -> bool:
@@ -108,6 +142,37 @@ async def _split_and_send(update: Update, text: str) -> None:
             await update.message.reply_text(chunk)
 
 
+async def _handle_image_tool_call(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    inference: InferenceService,
+    api_key: str | None,
+    tool_call,
+    conv: dict,
+    db: Database,
+) -> None:
+    """Execute a generate_image tool call and send the result."""
+    try:
+        args = json.loads(tool_call.function.arguments)
+        prompt = args.get("prompt", "")
+    except (json.JSONDecodeError, KeyError):
+        await update.message.reply_text("Sorry, I couldn't understand the image request.")
+        return
+
+    await update.message.chat.send_action(ChatAction.UPLOAD_PHOTO)
+
+    try:
+        image_bytes = await inference.generate_image(prompt=prompt, api_key=api_key)
+        await update.message.reply_photo(
+            photo=io.BytesIO(image_bytes),
+            caption=prompt[:1024],
+        )
+        await db.add_message(conv["id"], 0, "assistant", f"[Generated image: {prompt}]")
+    except Exception as e:
+        logger.error(f"Image generation error: {e}")
+        await update.message.reply_text("Sorry, I couldn't generate that image. Please try again.")
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle incoming text messages and photos."""
     if not update.message or not update.effective_user:
@@ -183,7 +248,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     # Build conversation history from DB (last N messages)
     history = await db.get_messages(conv["id"], limit=max_messages)
-    messages = []
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     for msg in history[:-1]:  # All except the one we just added
         messages.append({"role": msg["role"], "content": msg["content"]})
     # Add current message with potential vision content
@@ -193,7 +258,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await update.message.chat.send_action(ChatAction.TYPING)
 
     try:
-        response = await inference.chat(messages=messages, model=model, api_key=api_key)
+        result = await inference.chat(
+            messages=messages, model=model, api_key=api_key, tools=TOOLS,
+        )
     except Exception as e:
         logger.error(f"Inference error for user {telegram_id}: {e}")
         await update.message.reply_text(
@@ -201,6 +268,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         return
 
-    # Store and send response
-    await db.add_message(conv["id"], 0, "assistant", response)
-    await _split_and_send(update, response)
+    # Handle tool calls (e.g. image generation)
+    if result.tool_calls:
+        for tool_call in result.tool_calls:
+            if tool_call.function.name == "generate_image":
+                await _handle_image_tool_call(
+                    update, context, inference, api_key, tool_call, conv, db,
+                )
+        return
+
+    # Regular text response
+    response_text = result.content or ""
+    await db.add_message(conv["id"], 0, "assistant", response_text)
+    await _split_and_send(update, response_text)

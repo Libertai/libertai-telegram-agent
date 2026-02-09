@@ -51,7 +51,7 @@ class TestChat:
                 model="gemma-3-27b",
             )
 
-        assert result == "Hello from the model"
+        assert result.content == "Hello from the model"
         mock_client.chat.completions.create.assert_awaited_once_with(
             model="gemma-3-27b",
             messages=[{"role": "user", "content": "Hi"}],
