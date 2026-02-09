@@ -206,8 +206,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         allowed, remaining = await rate_limiter.check_and_increment(telegram_id, "message")
         if not allowed:
             await update.message.reply_text(
-                "You've reached your daily message limit.\n"
-                "Come back tomorrow, or get unlimited access at https://console.libertai.io"
+                "You've reached your daily free message limit.\n\n"
+                "For unlimited access:\n"
+                "1. Buy credits at https://console.libertai.io\n"
+                "2. Generate an API key at https://console.libertai.io/api-keys\n"
+                "3. Use /login <your-api-key> to connect your account"
             )
             return
 
