@@ -150,7 +150,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     # Get user's model
     user = await db.get_user(telegram_id)
-    model = user["default_model"] if user else "gemma-3-27b"
+    model = user["default_model"] if user else "qwen3-code-next"
 
     # Build user content text
     user_content = update.message.text or update.message.caption or ""

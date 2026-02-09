@@ -30,7 +30,7 @@ class TestConfigDefaults:
         settings = Settings()
 
         assert settings.libertai_api_base_url == "https://api.libertai.io/v1"
-        assert settings.default_model == "gemma-3-27b"
+        assert settings.default_model == "qwen3-code-next"
         assert settings.free_tier_daily_messages == 50
         assert settings.free_tier_daily_images == 5
         assert settings.max_conversation_messages == 20

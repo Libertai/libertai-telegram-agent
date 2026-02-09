@@ -40,7 +40,7 @@ class Database:
             CREATE TABLE IF NOT EXISTS users (
                 telegram_id INTEGER PRIMARY KEY,
                 api_key TEXT,
-                default_model TEXT DEFAULT 'gemma-3-27b',
+                default_model TEXT DEFAULT 'qwen3-code-next',
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             );

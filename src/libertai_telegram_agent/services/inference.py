@@ -5,6 +5,7 @@ import httpx
 from openai import AsyncOpenAI
 
 AVAILABLE_MODELS = {
+    "qwen3-code-next": {"name": "Qwen 3 Code Next", "tier": "free", "vision": False},
     "gemma-3-27b": {"name": "Gemma 3 27B", "tier": "free", "vision": True},
     "hermes-3-8b-tee": {"name": "Hermes 3 8B (TEE)", "tier": "free", "vision": False},
     "glm-4.7": {"name": "GLM 4.7", "tier": "pro", "vision": False},

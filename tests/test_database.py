@@ -92,7 +92,7 @@ class TestUserMethods:
     async def test_ensure_user_creates_new(self, db: Database):
         user = await db.ensure_user(100)
         assert user["telegram_id"] == 100
-        assert user["default_model"] == "gemma-3-27b"
+        assert user["default_model"] == "qwen3-code-next"
         assert user["api_key"] is None
         assert user["created_at"] is not None
         assert user["updated_at"] is not None
