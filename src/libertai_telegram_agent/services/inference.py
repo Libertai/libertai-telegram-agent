@@ -56,7 +56,7 @@ class InferenceService:
             "size": size,
             "response_format": "b64_json",
         }
-        async with httpx.AsyncClient() as http_client:
+        async with httpx.AsyncClient(timeout=60.0) as http_client:
             resp = await http_client.post(
                 f"{self.api_base_url}/images/generations",
                 headers=headers,
