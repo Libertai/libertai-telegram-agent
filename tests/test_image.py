@@ -5,7 +5,6 @@ from __future__ import annotations
 import io
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from telegram.constants import ChatAction
 
 from libertai_telegram_agent.handlers.image import image_command

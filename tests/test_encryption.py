@@ -2,7 +2,6 @@ from cryptography.fernet import Fernet
 
 from libertai_telegram_agent.services.encryption import decrypt_api_key, encrypt_api_key
 
-
 ENCRYPTION_KEY = Fernet.generate_key().decode()
 
 

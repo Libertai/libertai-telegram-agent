@@ -3,7 +3,6 @@ from pydantic import ValidationError
 
 from libertai_telegram_agent.config import Settings
 
-
 REQUIRED_ENV = {
     "TELEGRAM_BOT_TOKEN": "test-token-123",
     "LIBERTAI_API_KEY": "test-api-key-456",

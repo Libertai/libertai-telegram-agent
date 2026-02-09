@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 from cryptography.fernet import Fernet
 
-from libertai_telegram_agent.handlers.chat import handle_message, should_respond_in_group
 from libertai_telegram_agent.database.db import Database
-from libertai_telegram_agent.services.rate_limiter import RateLimiter
+from libertai_telegram_agent.handlers.chat import handle_message, should_respond_in_group
 from libertai_telegram_agent.services.inference import InferenceService
+from libertai_telegram_agent.services.rate_limiter import RateLimiter
 
 
 @pytest.fixture
@@ -159,7 +160,7 @@ class TestHandleMessageRateLimiting:
         limiter = RateLimiter(db, daily_messages=1, daily_images=0)
 
         # Set up a user with an encrypted API key
-        user = await db.ensure_user(12345)
+        await db.ensure_user(12345)
         encrypted = Fernet(encryption_key).encrypt(b"user-api-key").decode()
         await db.set_user_api_key(12345, encrypted)
 

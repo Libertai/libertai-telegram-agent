@@ -2,12 +2,12 @@
 
 import logging
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
 from libertai_telegram_agent.database.db import Database
-from libertai_telegram_agent.services.rate_limiter import RateLimiter
 from libertai_telegram_agent.services.inference import AVAILABLE_MODELS
+from libertai_telegram_agent.services.rate_limiter import RateLimiter
 
 logger = logging.getLogger(__name__)
 

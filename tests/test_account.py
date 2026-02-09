@@ -190,7 +190,11 @@ class TestLoginCommand:
         update.message.delete.assert_awaited_once()
         # Should send error via bot.send_message
         context.bot.send_message.assert_awaited_once()
-        text = context.bot.send_message.call_args[1].get("text", "") or context.bot.send_message.call_args[0][1] if len(context.bot.send_message.call_args[0]) > 1 else context.bot.send_message.call_args[1].get("text", "")
+        call_args = context.bot.send_message.call_args
+        if len(call_args[0]) > 1:
+            text = call_args[0][1]
+        else:
+            text = call_args[1].get("text", "")
         assert "invalid" in text.lower() or "failed" in text.lower() or "error" in text.lower()
 
     async def test_group_login_sets_group_admin(self, db, rate_limiter):

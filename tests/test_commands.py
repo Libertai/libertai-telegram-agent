@@ -1,17 +1,18 @@
 """Tests for command handlers."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
+from libertai_telegram_agent.database.db import Database
 from libertai_telegram_agent.handlers.commands import (
-    start_command,
-    new_command,
     help_command,
-    model_command,
     model_callback,
+    model_command,
+    new_command,
+    start_command,
     usage_command,
 )
-from libertai_telegram_agent.database.db import Database
 from libertai_telegram_agent.services.rate_limiter import RateLimiter
 
 
