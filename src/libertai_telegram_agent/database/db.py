@@ -62,6 +62,7 @@ class Database:
                 telegram_id INTEGER NOT NULL,
                 role TEXT NOT NULL,
                 content TEXT NOT NULL,
+                sender_name TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
@@ -167,12 +168,15 @@ class Database:
 
     # ── Message methods ────────────────────────────────────────────────
 
-    async def add_message(self, conversation_id: int, telegram_id: int, role: str, content: str) -> None:
+    async def add_message(
+        self, conversation_id: int, telegram_id: int, role: str, content: str, sender_name: str | None = None,
+    ) -> None:
         """Add a message to a conversation."""
         now = datetime.now(timezone.utc).isoformat()
         await self.db.execute(
-            "INSERT INTO messages (conversation_id, telegram_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)",
-            (conversation_id, telegram_id, role, content, now),
+            "INSERT INTO messages (conversation_id, telegram_id, role, content, sender_name, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            (conversation_id, telegram_id, role, content, sender_name, now),
         )
         await self.db.commit()
 

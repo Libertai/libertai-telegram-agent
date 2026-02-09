@@ -245,15 +245,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"}},
         ]
 
+    # Get sender name for group attribution
+    is_group = chat_type in ("group", "supergroup")
+    sender_name = update.effective_user.first_name if is_group else None
+
     # Store user message text in DB
-    await db.add_message(conv["id"], telegram_id, "user", message_content)
+    await db.add_message(conv["id"], telegram_id, "user", message_content, sender_name=sender_name)
 
     # Build conversation history from DB (last N messages)
     history = await db.get_messages(conv["id"], limit=max_messages)
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     for msg in history[:-1]:  # All except the one we just added
-        messages.append({"role": msg["role"], "content": msg["content"]})
+        content = msg["content"]
+        if msg["sender_name"] and msg["role"] == "user":
+            content = f"[{msg['sender_name']}] {content}"
+        messages.append({"role": msg["role"], "content": content})
     # Add current message with potential vision content
+    if sender_name and isinstance(openai_messages_content, str):
+        openai_messages_content = f"[{sender_name}] {openai_messages_content}"
     messages.append({"role": "user", "content": openai_messages_content})
 
     # Send typing indicator and generate response
