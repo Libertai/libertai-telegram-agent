@@ -168,8 +168,8 @@ async def _handle_image_tool_call(
             caption=prompt[:1024],
         )
         await db.add_message(conv["id"], 0, "assistant", f"[Generated image: {prompt}]")
-    except Exception as e:
-        logger.error(f"Image generation error: {e}")
+    except Exception:
+        logger.exception("Image generation error")
         await update.message.reply_text("Sorry, I couldn't generate that image. Please try again.")
 
 
