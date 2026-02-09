@@ -220,7 +220,7 @@ class TestModelCallback:
         context = make_context(db, rate_limiter)
         await model_callback(update, context)
         user = await db.get_user(12345)
-        assert user["default_model"] == "qwen3-code-next"  # unchanged
+        assert user["default_model"] == "qwen3-coder-next"  # unchanged
         call_text = update.callback_query.edit_message_text.call_args[0][0]
         assert "/login" in call_text
 
