@@ -1,5 +1,6 @@
 import logging
 
+from telegram import BotCommand
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -37,6 +38,18 @@ async def post_init(application: Application) -> None:
     application.bot_data["db"] = db
     application.bot_data["rate_limiter"]._db = db
     logger.info("Database initialized")
+
+    await application.bot.set_my_commands([
+        BotCommand("start", "Start the bot"),
+        BotCommand("new", "Start a new conversation"),
+        BotCommand("image", "Generate an image from a prompt"),
+        BotCommand("model", "Choose the AI model"),
+        BotCommand("usage", "Check your usage stats"),
+        BotCommand("account", "View your account status"),
+        BotCommand("login", "Connect your LibertAI API key"),
+        BotCommand("logout", "Disconnect your API key"),
+        BotCommand("help", "Show available commands"),
+    ])
 
 
 async def post_shutdown(application: Application) -> None:
