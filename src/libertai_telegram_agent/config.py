@@ -14,3 +14,4 @@ class Settings(BaseSettings):
     free_tier_daily_images: int = 50
     bot_encryption_key: str
     max_conversation_messages: int = 20
+    searchapi_api_key: str = ""

@@ -10,7 +10,6 @@ dependencies = [
     "aiosqlite>=0.20",
     "cryptography>=44.0",
     "pydantic-settings>=2.0",
-    "duckduckgo-search>=7.0",
     "beautifulsoup4>=4.12",
 ]
 

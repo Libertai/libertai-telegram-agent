@@ -22,6 +22,7 @@ from libertai_telegram_agent.handlers.commands import (
     usage_command,
 )
 from libertai_telegram_agent.handlers.image import image_command
+from libertai_telegram_agent.services import tools
 from libertai_telegram_agent.services.inference import InferenceService
 from libertai_telegram_agent.services.rate_limiter import RateLimiter
 
@@ -71,6 +72,7 @@ def create_application(settings: Settings | None = None) -> Application:
         .build()
     )
 
+    tools.configure(searchapi_api_key=settings.searchapi_api_key)
     app.bot_data["settings"] = settings
     app.bot_data["encryption_key"] = settings.bot_encryption_key
     app.bot_data["max_conversation_messages"] = settings.max_conversation_messages

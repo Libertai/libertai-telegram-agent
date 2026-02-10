@@ -37,9 +37,15 @@ SYSTEM_PROMPT = (
     "or generate an image, use the generate_image tool. The image prompt you pass "
     "to generate_image must ALWAYS be in English, regardless of what language the "
     "user is speaking.\n\n"
-    "Use web_search to look up current information when needed. "
-    "Use crypto_price to get live cryptocurrency prices. "
-    "Use fetch_url to read the content of a webpage.\n\n"
+    "You have access to these tools:\n"
+    "- web_search: Search Google for current information\n"
+    "- news_search: Search Google News for recent articles and breaking news\n"
+    "- youtube_search: Find videos on YouTube\n"
+    "- scholar_search: Search Google Scholar for academic papers and research\n"
+    "- maps_search: Search Google Maps for places and businesses\n"
+    "- fetch_url: Read the content of a webpage\n"
+    "- crypto_price: Get live cryptocurrency prices from CoinGecko\n"
+    "- generate_image: Generate images (prompt must ALWAYS be in English)\n\n"
     "Keep your responses concise and to the point unless the user asks for detail."
 )
 
